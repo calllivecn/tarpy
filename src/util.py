@@ -5,6 +5,7 @@
 
 from typing import (
     Optional,
+    Literal,
 )
 
 
@@ -20,6 +21,7 @@ from struct import Struct
 from fnmatch import fnmatchcase
 from contextlib import contextmanager
 import traceback
+from compression import zstd
 
 from pyzstd import (
     CParameter,
@@ -27,7 +29,6 @@ from pyzstd import (
     ZstdCompressor,
     ZstdDecompressor,
 )
-
 
 import libcrypto
 from protocols import (
@@ -167,7 +168,7 @@ class Pipefork:
 
 
 @contextmanager
-def open_stream(path: Path|str, mode: str):
+def open_stream(path: Path|str, mode: Literal["r", "w"]):
     """
     通用打开流：path 为 "-" 时返回标准输入/输出的 buffer，否则打开文件。
     只在实际打开文件时负责关闭流；标准流不关闭。
@@ -221,6 +222,36 @@ def decompress(rpipe: ReadWrite, wpipe: ReadWrite):
             wpipe.write(tar_data)
     wpipe.close()
 
+def compress_py314(rpipe: ReadWrite, wpipe: ReadWrite, level: int, threads: int):
+    op = {
+        zstd.CompressionParameter.compression_level: level,
+        zstd.CompressionParameter.nb_workers: threads
+    }
+
+    Zst = zstd.ZstdCompressor(options=op)
+    logger.debug(f"压缩等级: {level}, 线程数: {threads}")
+
+    while (tar_data := rpipe.read(BLOCKSIZE)) != b"":
+        # 有时候写入的数据少(或者压缩的好)，会返回空
+        zdata = Zst.compress(tar_data)
+        if zdata:
+            wpipe.write(zdata)
+
+    wpipe.write(Zst.flush())
+
+    logger.debug("压缩完成")
+    wpipe.close()
+
+def decompress_py314(rpipe: ReadWrite, wpipe: ReadWrite):
+    # 解压没有 nbWorkers 参数
+    zst = zstd.ZstdDecompressor()
+    while (zst_data := rpipe.read(BLOCKSIZE)) != b"":
+        tar_data = zst.decompress(zst_data)
+        if tar_data:
+            wpipe.write(tar_data)
+    wpipe.close()
+
+
 ##################
 # crypto 相关处理函数
 ##################
@@ -258,10 +289,10 @@ def decrypt(rpipe: ReadWrite, wpipe: ReadWrite, password):
     aes.decrypt(rpipe, wpipe, file_version)
     wpipe.close()
 
+
 # 查看加密提示信息
 def prompt(path: Path):
     libcrypto.fileinfo(path)
-
 
 
 ##################
@@ -274,6 +305,8 @@ def order_bad_path(tarinfo: tarfile.TarInfo):
     处理掉不安全 tar 成员路径(这样有可能会产生冲突而覆盖文件):
     ../../dir1/file1 --> dir1/file1
     注意：使用 Path() 包装过的路径，只会剩下左边的"../"; 所以可以这样处理。
+    
+    新版本的：tarfile.data_filter()过滤器已经处理了这种情况。
     """
     path = Path(tarinfo.name)
     cwd = Path()
@@ -286,32 +319,35 @@ def order_bad_path(tarinfo: tarfile.TarInfo):
     tarinfo.name = str(cwd)
 
 
+class TarpyFilter:
 
-def extract(readable: ReadWrite, path: Path, verbose=False, safe_extract=False):
+    def __init__(self, verbose=False):
+        self.verbose = verbose
+
+    def __call__(self, member, path):
+
+        if self.verbose:
+            logger_print.info(f"{member.name}")
+        
+        try:
+            tarfile.data_filter(member, path)
+        except Exception as e:
+            logger.error(f"{member}: 报错跳过处理", exc_info=e)
+
+
+def extract(readable: ReadWrite, path: Path, verbose=False):
     """
-    这里只需要处理 tar 的解压流。
+    这里只需要处理 tar.* 的解压流。
     """
+    tarpy_filter = TarpyFilter(verbose)
     tar: tarfile.TarFile
     with tarfile.open(mode="r|*", fileobj=readable) as tar:
-        while (tarinfo := tar.next()) is not None:
-            if ".." in tarinfo.name:
-                if safe_extract:
-                    logger.info(f"成员路径包含 `..' 不提取: {tarinfo.name}")
-                else:
-                    logger.info(f"成员路径包含 `..' 提取为: {tarinfo.name}")
-                    order_bad_path(tarinfo)
-
-            if verbose:
-                logger_print.info(f"{tarinfo.name}")
-
-            # 安全的直接提取
-            tar.extract(tarinfo, path, filter=tarfile.data_filter)
+        tar.extractall(path, filter=tarpy_filter)
 
 
-# def tarlist(readable: Path | BinaryIO | io.BufferedReader, verbose=False):
 def tarlist(readable: Path | ReadWrite, verbose=False):
     """
-    些函数只用来解压: tar, tar.gz, tar.bz2, tar.xz, 包。
+    些函数只用来解压: tar, tar.gz, tar.bz2, tar.xz, tar.zst 包。
     """
     tar: tarfile.TarFile
     if isinstance(readable, Path):
@@ -319,7 +355,6 @@ def tarlist(readable: Path | ReadWrite, verbose=False):
                 tar.list(verbose)
 
     elif hasattr(readable, "read"):
-        # 从标准输入提取
         with tarfile.open(mode="r|*", fileobj=readable) as tar:
             tar.list(verbose)
 
@@ -350,35 +385,26 @@ def tar2pipe(paths: list[Path], pipe: ReadWrite, verbose, excludes: list = []):
     tar: tarfile.TarFile
     with tarfile.open(mode="w|", fileobj=pipe) as tar:
         for path in paths:
-            abspath = path.resolve()
-            arcname = abspath.relative_to(abspath.parent)
-            tar.add(path, arcname, filter=lambda x: filter(x, verbose, excludes))
-    
+            tar.add(path, filter=filter)
     logger.debug(f"打包完成: {paths}")
     pipe.close()
 
 
-# 提取到路径下
-def pipe2tar(pipe: ReadWrite, path: Path, verbose=False, safe_extract=False):
+# 提取到路径下# py 3.14 之前的，
+def pipe2tar(pipe: ReadWrite, path: Path, verbose=False):
     tar: tarfile.TarFile
-    with tarfile.open(mode="r|", fileobj=pipe) as tar:
+    with tarfile.open(mode="r|*", fileobj=pipe) as tar:
         while (tarinfo := tar.next()) is not None:
-            if ".." in tarinfo.name:
-                if safe_extract:
-                    logger_print.info(f"成员路径包含 `..' 不提取: {tarinfo.name}")
-                else:
-                    logger_print.info(f"成员路径包含 `..' 提取为: {tarinfo.name}")
-                    order_bad_path(tarinfo)
-
+        
             if verbose:
                 logger_print.info(f"{tarinfo.name}")
 
             tar.extract(tarinfo, path, filter=tarfile.data_filter)
 
-
+# py 3.14 之前的
 def pipe2tarlist(pipe: ReadWrite, verbose=False):
     tar: tarfile.TarFile
-    with tarfile.open(mode="r|", fileobj=pipe) as tar:
+    with tarfile.open(mode="r|*", fileobj=pipe) as tar:
         tar.list(verbose)
 
 # py3.14 新的方式可以简化代码。
@@ -441,7 +467,7 @@ class SplitError(Exception):
 
 class FileSplitterMerger:
 
-    def split(self, prefix: str, splitsize: int, input: ReadWrite, output: Path):
+    def split(self, filename: str, splitsize: int, input: ReadWrite, output: Path):
         """按指定的字节数将输入文件拆分为多个文件。"""
         file_count = 0
         bytes_written_current_file = 0
@@ -462,7 +488,7 @@ class FileSplitterMerger:
                         if outfile:
                             outfile.close()
 
-                        out_filename = output / f"{prefix}.{file_count}"  # 使用零填充的编号
+                        out_filename = output / f"{filename}.{file_count}"  # 使用零填充的编号
                         logger.debug(f"正在创建文件 '{out_filename}'")
 
                         outfile = open(out_filename, 'wb')
@@ -483,11 +509,11 @@ class FileSplitterMerger:
 
         return 0
 
-    def merge(self, prefix: str, input: Path, output: io.BufferedWriter):
+    def merge(self, filename: str, input: Path, output: io.BufferedWriter):
         """将具有指定前缀的多个文件合并为一个文件。"""
 
         try:
-            file_generator = self.__file_generator(prefix)
+            file_generator = self.__file_generator(filename)
 
             while True:
                 filename = next(file_generator)
@@ -510,11 +536,11 @@ class FileSplitterMerger:
         finally:
             output.close()
 
-    def __file_generator(self, prefix):
+    def __file_generator(self, filename):
         """生成器：按后缀递增顺序生成文件名"""
         index = 0
         while True:
-            file_name = Path(f"{prefix}.{index}")
+            file_name = f"{filename}.{index}"
             logger.debug(f"检查文件 '{file_name}'")
 
             yield file_name
@@ -522,28 +548,46 @@ class FileSplitterMerger:
 
 
 def split_prefix(args) -> str:
-    split_prefix = args.split_prefix
+    """
+    创建的时候使用
+    """
+    # data.tar
+    split_prefix = f"{args.split_prefix}.{args.split_suffix}"
 
     if args.z:
-        split_prefix = "data.tz"
+        split_prefix = f"{args.split_prefix}.tz"
 
     if args.e:
-        split_prefix = "data.ta"
+        split_prefix = f"{args.split_prefix}.ta"
 
     if args.z and args.e:
-        split_prefix = "data.tza"
+        split_prefix = f"{args.split_prefix}.tza"
 
     return split_prefix
 
 
-def split(rpipe: ReadWrite, filename_prefix: str, splitsize: int, output_dir: Path):
+def merge_prefix(args) -> Path:
+    """
+    合并的时候自动检测 e
+    """
+
+    for split_suffix in (".tar", ".tz" ".ta", ".tza"):
+        filename = args.split / f"{args.split_prefix}{split_suffix}"
+        filename_number = args.split / f"{args.split_prefix}{split_suffix}.0"
+        if filename_number.exists():
+            return filename
+    
+    raise SplitError(f"没有检测到符合规范的文件前缀: {args.split_prefix}")
+
+
+def split(rpipe: ReadWrite, filename: str, splitsize: int, output_dir: Path):
     splitter = FileSplitterMerger()
-    splitter.split(filename_prefix, splitsize, rpipe, output_dir)
+    splitter.split(filename, splitsize, rpipe, output_dir)
 
 
-def merge(prefix: str, input: Path, output: io.BufferedWriter):
+def merge(filename: str, input: Path, output: io.BufferedWriter):
     merger = FileSplitterMerger()
-    merger.merge(prefix, input, output)
+    merger.merge(filename, input, output)
 
 
 class ThreadManager:

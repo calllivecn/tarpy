@@ -140,7 +140,8 @@ def parse_args() -> tuple[Argument, Namespace]:
     group1.add_argument("-x", action="store_true", help="解压tar文件")
     group1.add_argument("-t", "--list", action="store_true", help="输出tar文件内容")
 
-    parse.add_argument("--safe-extract", dest="safe_extract", action="store_true", help="解压时处理tar里不安全的路径")
+    parse.add_argument("--dereference", action="store_true", default=False, help="默认为：False，如果为 True，则会将目标文件的内容添加到归档中。在不支持符号链接的系统上参数将不起作用。")
+    parse.add_argument("--safe-extract", dest="safe_extract", action="store_true", help="解压时处理tar里不安全的路径(default: true)")
     parse.add_argument("-v", "--verbose", action="count", default=0, help="输出详情")
     parse.add_argument("-d", "--debug", action="count", default=0, help="输出debug详情信息")
 
@@ -175,18 +176,19 @@ def parse_args() -> tuple[Argument, Namespace]:
     parse_hash.add_argument("--sha384", action="store_true", help="输出文件同时计算 sha384")
     parse_hash.add_argument("--sha512", action="store_true", help="输出文件同时计算 sha512")
     parse_hash.add_argument("--blake2b", action="store_true", help="输出文件同时计算 blake2b")
-    parse_hash.add_argument("--sha-all", action="store_true", help="计算以上所有哈希值")
+    parse_hash.add_argument("--sha-all", action="store_true", help="同时计算以上所有哈希值")
 
     split_description = """
-    在创建时分害会创建这里提供的目录。把文件名从-z -e这里生成。
+    在创建时分割会创建这里提供的目录。把文件名从-z -e这里生成。
     会根据 -z 和 -e 选项来生成对应后缀*.tar|*.t, *.tz, *.ta, *.tza
     当没有指定--sha-file时，会输出到--split 目录下名为: sha.txt
     """
     parse_split = parse.add_argument_group("切割输出文件", description=split_description)
     parse_split.add_argument("--split", type=split_is_dir, help="切割时的输出目录 或者是 合并时的输入目录 (default: .)")
     parse_split.add_argument("--split-size", type=split_size, default="1G", help="单个文件最大大小(单位：B, K, M, G, T, P。 默认值：1G)")
-    parse_split.add_argument("--split-prefix", default="data.tar", help="指定切割文件的前缀(default: data.tar) 其他几种: *.tar|*.t, *.tz, *.ta, *.tza")
-    # parse_split.add_argument("--suffix", default="00", help="指定切割文件后缀(default: 00 开始)" )
+    parse_split.add_argument("--split-prefix", default="data", help="指定切割文件的前缀名(default: data)")
+    parse_split.add_argument("--split-suffix", default="tar", help="自动生成，不需要指定。切割文件的后缀，几种: *.tar|*.t, *.tz, *.ta, *.tza")
+    # parse_split.add_argument("--suffix-number", default="00", help="指定切割文件后缀(default: 00 开始)" )
     parse_split.add_argument("--split-sha", action="store_true", help="计算切割文件的sha值(通过前面的sha系列指定算法)。(default: sha256)")
 
 
