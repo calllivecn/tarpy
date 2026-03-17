@@ -601,6 +601,7 @@ class ThreadManager:
         except Exception as e:
             traceback.print_exc()
             logger.error(f"线程 {threading.current_thread().name} 出现异常: {e}")
+            logger.error("可能原因：\n1. 密码错误。\n2. 可以解压格式不对。")
             self.stop_event.set()
 
     def join_threads(self):
