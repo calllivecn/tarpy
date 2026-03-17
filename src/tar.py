@@ -90,6 +90,7 @@ def extract_not_split(args):
                 util.pipe2tar(p, args.C, args.verbose, args.safe_extract)
             except tarfile.ReadError:
                 logger_print.info(f"解压: {NEWTARS} 需要指定，-z|-e 参数。")
+                logger_print.info("可能原因：\n1. 密码错误。\n2. 可以解压格式不对。")
                 sys.exit(1)
 
             manager.join_threads()
@@ -116,6 +117,7 @@ def extract4split(args):
         util.pipe2tar(p, args.C, args.verbose, args.safe_extract)
     except tarfile.ReadError:
         logger_print.info(f"解压: {NEWTARS} 需要指定，-z|-e 参数。")
+        logger_print.info("可能原因：\n1. 密码错误。\n2. 可以解压格式不对。")
         sys.exit(1)
 
     manager.join_threads()
@@ -195,6 +197,7 @@ def tarlist4split(args):
         util.pipe2tarlist(p, args.verbose)
     except tarfile.ReadError:
         logger_print.info(f"从标准输入解压: {NEWTARS} 需要指定，-z|-e 参数。")
+        logger_print.info("可能原因：\n1. 密码错误。\n2. 可以解压格式不对。")
         sys.exit(1)
 
     manager.join_threads()
