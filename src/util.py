@@ -381,6 +381,9 @@ def pipe2tarlist(pipe: ReadWrite, verbose=False):
     with tarfile.open(mode="r|", fileobj=pipe) as tar:
         tar.list(verbose)
 
+# py3.14 新的方式可以简化代码。
+
+
 
 #################
 # pipe 2 file and pipe 2 pipe

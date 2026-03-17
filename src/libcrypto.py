@@ -23,7 +23,7 @@ from typing import (
 )
 
 from cryptography.hazmat.primitives.kdf import (
-    pbkdf2,
+    # pbkdf2,
     argon2,
 )
 from cryptography.hazmat.primitives.ciphers import (
@@ -81,11 +81,21 @@ def open_stream(path: str, mode: str):
         finally:
             f.close()
 
+def read_packet_0x01_0x02(in_stream: ReadWrite, size: int) -> memoryview:
+    """
+    fix bug: 2026-03-17
+    在0x02, 0x01 上不行。0x01 上 是流式读写，不是块式读写。
+    """
+    data = io.BytesIO()
+    data.write(in_stream.read(size))
+    return data.getbuffer()
+
 
 # 读取指定大小数据，以解析信息。
 def read_packet(in_stream: ReadWrite, size: int) -> memoryview:
     """
     读取指定大小的数据。
+    只能在 file version code: 0x03版本使用
     """
     data = io.BytesIO()
     while data.tell() < size:
@@ -357,7 +367,7 @@ class AESCrypto:
         aes = cipher.encryptor()
 
         # 加密数据块
-        while (data := read_packet(in_stream, BLOCK)) != b"":
+        while (data := read_packet_0x01_0x02(in_stream, BLOCK)) != b"":
             out_stream.write(aes.update(data))
         out_stream.write(aes.finalize())
 

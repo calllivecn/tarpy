@@ -31,3 +31,28 @@ class PIPE:
     def close2(self):
         os.close(self.r)
 ```
+
+
+- 例如：在处理几十GB的日志压缩包下载流时，边下载边解压，不把整个文件保存到本地硬盘：
+
+```py
+import tarfile
+import requests
+
+response = requests.get("http://example.com/huge-logs.tar.gz", stream=True)
+# 用 r|gz 模式直接读取 HTTP 响应流 (response.raw)
+with tarfile.open(fileobj=response.raw, mode="r|gz") as tar:
+    for member in tar:
+        if member.name.endswith(".log"):
+            f = tar.extractfile(member)
+            # 处理日志数据... 
+            # 注意：处理完毕后该 member 即从内存释放，无法再次访问
+```
+
+
+## 记录
+
+- 果 dereference 为 False，则会将符号链接和硬链接添加到归档中。
+- 如果为 True，则会将目标文件的内容添加到归档中。在不支持符号链接的系统上参数将不起作用。
+
+- 在 tarfile 模块中，普通模式（Normal Mode，如 r:、w:gz）和流模式（Stream Mode，如 r|、w|gz）的核心区别在于对底层文件对象是否要求支持“随机访问（Seekable）”。
