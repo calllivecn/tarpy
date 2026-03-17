@@ -65,9 +65,12 @@ def create(args, shafuncs):
 
 def extract_not_split(args):
 
+    suffixs = args.f.suffixes
+    suffix = "".join(suffixs).lower()
+
     with util.open_stream(args.f, "r") as f:
         # 解压*.tar.gz *.tar.xz *.tar.bz2 *.tar.zst
-        if not args.e:
+        if suffix in TARFILE:
             try:
                 util.extract(f, args.C, args.verbose)
             except tarfile.ReadError:
@@ -75,12 +78,15 @@ def extract_not_split(args):
                 sys.exit(0)
     
         # 解压后缀：NEWTARS
-        else:
+        elif suffix in NEWTARS:
             manager = util.ThreadManager()
 
             p = manager.add_task(util.to_pipe, f, None, name="to pipe")
 
-            if args.e:
+            # if args.e:
+            # 自动检测是否解密
+            if suffix in (".tar.zst.aes", ".tz", ".tza"):
+                input_key(args)
                 p = manager.add_task(util.decrypt, p, None, args.k, name="decrypt")
     
             # if args.z:
@@ -95,6 +101,10 @@ def extract_not_split(args):
                 sys.exit(1)
 
             manager.join_threads()
+        
+        else:
+            raise tarfile.ReadError(f"未知格式文件: {args.f}")
+
 
 
 def extract4split(args):
@@ -112,14 +122,10 @@ def extract4split(args):
     else:
         p = manager.add_pipe()
 
-    if file.suffix in (".tz", ".tza"):
-        input_key(args)
-        p = manager.add_task(util.decrypt, p, None, args.k, name="decrypt")
-
     # 自动检测是否解密
     if file.suffix in (".tz", ".tza"):
         input_key(args)
-        p = manager.add_task(util.decrypt, p, None, args.k)
+        p = manager.add_task(util.decrypt, p, None, args.k, name="decrypt")
     
 
     # if args.z:
@@ -223,7 +229,7 @@ def tarlist(args):
                 sys.exit(0)
 
         else:
-            raise tarfile.ReadError("未知格式文件")
+            raise tarfile.ReadError(f"未知格式文件: {args.f}")
 
 
 def split_sha(args, shafuncs):
