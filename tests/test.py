@@ -11,7 +11,7 @@ import shutil
 import os
 from pathlib import Path
 
-import version
+from src import version
 
 
 TAR_SCRIPT = os.path.abspath(os.path.join(os.path.dirname(__file__), "tar.py"))

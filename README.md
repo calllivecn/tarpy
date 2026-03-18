@@ -8,40 +8,45 @@ usage: tar.py [option] [file ... or directory ...]
 POXIS tar 工具 + zstd + AES加密 + sha计算 + split大文件分割
 
 例子:
-    tar.py -cf archive.tar foo bar                # 把 foo 和 bar 文件打包为 archive.tar 文件。
-    tar.py -zcf archive.tar.zst foo bar           # 把 foo 和 bar 文件打包为 archive.tar.zst 文件。
-    tar.py -tvf archive.tar                       # 列出 archive.tar 里面的文件，-v 选项，列出详细信息。
-    tar.py -xf archive.tar                        # 解压 archive.tar 全部文件到当前目录。
-    tar.py -ecf archive.tar                       # 打包 archive.tar 后同时加密。
-    tar.py -ezcf archive.tar.zst                  # 打包 archive.tar.zst 后同时加密。
-    tar.py --info archive.ta                      # 查看提示信息,如果有的话。
+    tar.py -cf archive.tar foo/ bar                # 打包 foo 和 bar 文件打包为 archive.tar 文件。
+    tar.py -zcf archive.tar.zst foo/ bar           # 打包 foo 和 bar 文件打包为 archive.tar.zst 文件。
 
-    tar.py -c --split archinve_dir/ foo bar       # 把 foo 和 bar 文件打包为 archinve_dir/ 目录下的切割文件。
-    tar.py -zvc --split archinve_dir/ foo bar     # 把 foo 和 bar 文件打包+压缩为 archinve_dir/ 目录下的切割文件。
-    tar.py -ezvc --split archinve_dir/ foo bar    # 把 foo 和 bar 文件打包+压缩+加密为 archinve_dir/ 目录下的切割文件。
+    tar.py -ecf archive.ta foo/ bar                # 打包 后同时加密。
+    tar.py -ezcf archive.tza foo/ bar              # 打包 后同时加密。
 
-    tar.py -vx --split archinve_dir/              # 解压目录 archinve_dir/ 目录下的切割文件。
-    tar.py -zvx --split archinve_dir/             # 解压目录 archinve_dir/ 目录下的切割文件。
-    tar.py -ezvx --split archinve_dir/            # 解压目录 archinve_dir/ 目录下的切割文件。
+    tar.py -tf archive.tar                         # 查看 archive.tar 里面的文件，-v 选项，列出详细信息。
+    tar.py -tf archive.tz                          # 查看 archive.tz 里面的文件，-v 选项，列出详细信息。
+    tar.py -tf archive.tza                         # 查看 archive.tza 里面的文件，-v 选项，列出详细信息。
 
-    tar.py --info archive_dir/data.ta.0          # 查看提示信息,如果有的话
+    tar.py -xf archive.tar                         # 解压 archive.tar 全部文件到当前目录。
+    tar.py -xf archive.tz                          # 解压 archive.tz 全部文件到当前目录。
+    tar.py -xf archive.tza                         # 解压 archive.tz 全部文件到当前目录。
 
-    使用-t查看文件内容时:
-    如果文件后缀是(".tar.zst", ".tar.aes", ".tar.zst.aes", ".tz", ".ta", ".tza")需要指定对应的-z 或者 -e 参数。
-    解压 *.tar.gz *.tar.xz *.tar.bz2 时，不要指定 -z 和 -e。
+    tar.py --info archive.ta                       # 查看密码提示信息。
+
+    tar.py -c --split archinve_dir/ foo/ bar       # 打包 foo 和 bar 文件打包为 archinve_dir/ 目录下的切割文件。
+    tar.py -zvc --split archinve_dir/ foo/ bar     # 打包 foo 和 bar 文件打包+压缩为 archinve_dir/ 目录下的切割文件。
+    tar.py -ezvc --split archinve_dir/ foo bar     # 打包 foo 和 bar 文件打包+压缩+加密为 archinve_dir/ 目录下的切割文件。
+
+    tar.py -vx --split archinve_dir/               # 解压 目录 archinve_dir/ 目录下的切割文件。
+
+    tar.py --info archive_dir/data.ta.0            # 查看加密提示信息。
+
+    从标准输出查看或解压内容时，需要用户判断是否需要添加-e参数。
 
 位置参数:
   target                文件s | 目录s
 
 通用选项:
   -h, --help            输出帮助信息
-  -f F                  archive 文件, 没有这参数时，默认使用标准输入输出。
+  -f F                  archive 文件, 没有这参数时 或者 参数为:-, 默认使用标准输入输出。
   -C C                  解压输出目录(default: .)
-  -O                    解压文件时输出 标准输出。创建文件时从 标准输入 读取。
   -c                    创建tar文件
   -x                    解压tar文件
   -t, --list            输出tar文件内容
-  --safe-extract        解压时处理tar里不安全的路径
+  --dereference         默认为：False，如果为True，则会将目标文件的内容添加到归档中。
+                        在不支持符号链接的系统上参数将不起作用。
+  --safe-extract        解压时处理tar里不安全的路径(default: true)
   -v, --verbose         输出详情
   -d, --debug           输出debug详情信息
   --excludes PATTERN [PATTERN ...]
@@ -52,13 +57,13 @@ POXIS tar 工具 + zstd + AES加密 + sha计算 + split大文件分割
 
   -z                    使用zstd压缩(default: level=3)
   -l level              指定压缩level: 1 ~ 22
-  -T threads            默认使用CPU物理/2的核心数，最大8个线程。
+  -T threads            默认使用CPU物理/2的核心数，默认最大只使用8个线程。
 
 加密:
   使用aes-256系列加密算法
 
   -e                    加密
-  -k PASSWORK           指定密码 (default：启动后交互式输入)
+  -k PASSWORD           指定密码 (default：启动后交互式输入)
   --prompt PROMPT       密码提示信息
   --info INFO           查看加密提示信息
 
@@ -71,11 +76,11 @@ POXIS tar 工具 + zstd + AES加密 + sha计算 + split大文件分割
   --sha384              输出文件同时计算 sha384
   --sha512              输出文件同时计算 sha512
   --blake2b             输出文件同时计算 blake2b
-  --sha-all             计算以上所有哈希值
+  --sha-all             同时计算以上所有哈希值
 
 切割输出文件:
   
-      在创建时分害会创建这里提供的目录。把文件名从-z -e这里生成。
+      在创建时分割会创建这里提供的目录。把文件名从-z -e这里生成。
       会根据 -z 和 -e 选项来生成对应后缀*.tar|*.t, *.tz, *.ta, *.tza
       当没有指定--sha-file时，会输出到--split 目录下名为: sha.txt
       
@@ -84,9 +89,10 @@ POXIS tar 工具 + zstd + AES加密 + sha计算 + split大文件分割
   --split-size SPLIT_SIZE
                         单个文件最大大小(单位：B, K, M, G, T, P。 默认值：1G)
   --split-prefix SPLIT_PREFIX
-                        指定切割文件的前缀(default: data.tar) 其他几种: *.tar|*.t, *.tz,
-                        *.ta, *.tza
-  --split-sha           计算切割文件的sha值(通过前面的sha系列指定算法)。(default: sha256)
+                        指定切割文件的前缀名(default: data)
+  --split-suffix SPLIT_SUFFIX
+                        自动生成，不需要指定。切割文件的后缀，几种: *.tar|*.t, *.tz, *.ta, *.tza
+  --split-sha           计算忆切割文件的sha值(通过前面的sha系列指定算法)。(default: sha256)
 
-Author: calllivecn <calllivecn@outlook.com>, Version: 0.10.1 Repositories: https://github.com/calllivecn/tar.py
+Author: calllivecn <calllivecn@outlook.com>, Version: 1.0 Repositories: https://github.com/calllivecn/tar.py
 ```

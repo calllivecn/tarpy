@@ -306,8 +306,6 @@ def order_bad_path(tarinfo: tarfile.TarInfo):
     处理掉不安全 tar 成员路径(这样有可能会产生冲突而覆盖文件):
     ../../dir1/file1 --> dir1/file1
     注意：使用 Path() 包装过的路径，只会剩下左边的"../"; 所以可以这样处理。
-    
-    新版本的：tarfile.data_filter()过滤器已经处理了这种情况。
     """
     path = Path(tarinfo.name)
     cwd = Path()
@@ -376,6 +374,8 @@ class AddFilter:
 
     def __call__(self, tarinfo: tarfile.TarInfo):
 
+        order_bad_path(tarinfo)
+
         if self.verbose:
             logger_print.info(f"{tarinfo.name}")
 
@@ -387,7 +387,7 @@ class AddFilter:
 
 
 # 创建
-def tar2pipe(paths: list[Path], pipe: ReadWrite, verbose, excludes: list = []):
+def tar2pipe(paths: list[Path], pipe: ReadWrite, verbose: bool, dereference: bool, excludes: list = []):
     """
     处理打包路径安全:
     只使用 给出路径最右侧做为要打包的内容
@@ -395,7 +395,7 @@ def tar2pipe(paths: list[Path], pipe: ReadWrite, verbose, excludes: list = []):
     """
     add_filter = AddFilter(verbose, excludes)
     tar: tarfile.TarFile
-    with tarfile.open(mode="w|", fileobj=pipe) as tar:
+    with tarfile.open(mode="w|", fileobj=pipe, dereference=dereference) as tar:
         for path in paths:
             tar.add(path, filter=add_filter)
     logger.debug(f"打包完成: {paths}")

@@ -69,7 +69,7 @@ def check_suffix_tar(f: Optional[Path]) -> bool:
 def create(args, shafuncs):
     manager = util.ThreadManager()
 
-    p = manager.add_task(util.tar2pipe, args.target, None, args.verbose, args.excludes, name="tar --> pipe")
+    p = manager.add_task(util.tar2pipe, args.target, None, args.verbose, args.dereference, args.excludes, name="tar --> pipe")
 
     if args.z:
         p = manager.add_task(util.compress_py314, p, None, args.level, args.threads, name="zstd")

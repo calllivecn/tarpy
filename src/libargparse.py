@@ -95,27 +95,31 @@ Description='''\
 POXIS tar 工具 + zstd + AES加密 + sha计算 + split大文件分割
 
 例子:
-    %(prog)s -cf archive.tar foo bar                # 把 foo 和 bar 文件打包为 archive.tar 文件。
-    %(prog)s -zcf archive.tar.zst foo bar           # 把 foo 和 bar 文件打包为 archive.tar.zst 文件。
-    %(prog)s -tvf archive.tar                       # 列出 archive.tar 里面的文件，-v 选项，列出详细信息。
-    %(prog)s -xf archive.tar                        # 解压 archive.tar 全部文件到当前目录。
-    %(prog)s -ecf archive.tar                       # 打包 archive.tar 后同时加密。
-    %(prog)s -ezcf archive.tar.zst                  # 打包 archive.tar.zst 后同时加密。
-    %(prog)s --info archive.ta                      # 查看提示信息,如果有的话。
+    %(prog)s -cf archive.tar foo/ bar                # 打包 foo 和 bar 文件打包为 archive.tar 文件。
+    %(prog)s -zcf archive.tar.zst foo/ bar           # 打包 foo 和 bar 文件打包为 archive.tar.zst 文件。
 
-    %(prog)s -c --split archinve_dir/ foo bar       # 把 foo 和 bar 文件打包为 archinve_dir/ 目录下的切割文件。
-    %(prog)s -zvc --split archinve_dir/ foo bar     # 把 foo 和 bar 文件打包+压缩为 archinve_dir/ 目录下的切割文件。
-    %(prog)s -ezvc --split archinve_dir/ foo bar    # 把 foo 和 bar 文件打包+压缩+加密为 archinve_dir/ 目录下的切割文件。
+    %(prog)s -ecf archive.ta foo/ bar                # 打包 后同时加密。
+    %(prog)s -ezcf archive.tza foo/ bar              # 打包 后同时加密。
 
-    %(prog)s -vx --split archinve_dir/              # 解压目录 archinve_dir/ 目录下的切割文件。
-    %(prog)s -zvx --split archinve_dir/             # 解压目录 archinve_dir/ 目录下的切割文件。
-    %(prog)s -ezvx --split archinve_dir/            # 解压目录 archinve_dir/ 目录下的切割文件。
+    %(prog)s -tf archive.tar                         # 查看 archive.tar 里面的文件，-v 选项，列出详细信息。
+    %(prog)s -tf archive.tz                          # 查看 archive.tz 里面的文件，-v 选项，列出详细信息。
+    %(prog)s -tf archive.tza                         # 查看 archive.tza 里面的文件，-v 选项，列出详细信息。
 
-    %(prog)s --info archive_dir/data.ta.0          # 查看提示信息,如果有的话
+    %(prog)s -xf archive.tar                         # 解压 archive.tar 全部文件到当前目录。
+    %(prog)s -xf archive.tz                          # 解压 archive.tz 全部文件到当前目录。
+    %(prog)s -xf archive.tza                         # 解压 archive.tz 全部文件到当前目录。
 
-    使用-t查看文件内容时:
-    如果文件后缀是(".tar.zst", ".tar.aes", ".tar.zst.aes", ".tz", ".ta", ".tza")需要指定对应的-z 或者 -e 参数。
-    解压 *.tar.gz *.tar.xz *.tar.bz2 时，不要指定 -z 和 -e。
+    %(prog)s --info archive.ta                       # 查看密码提示信息。
+
+    %(prog)s -c --split archinve_dir/ foo/ bar       # 打包 foo 和 bar 文件打包为 archinve_dir/ 目录下的切割文件。
+    %(prog)s -zvc --split archinve_dir/ foo/ bar     # 打包 foo 和 bar 文件打包+压缩为 archinve_dir/ 目录下的切割文件。
+    %(prog)s -ezvc --split archinve_dir/ foo bar     # 打包 foo 和 bar 文件打包+压缩+加密为 archinve_dir/ 目录下的切割文件。
+
+    %(prog)s -vx --split archinve_dir/               # 解压 目录 archinve_dir/ 目录下的切割文件。
+
+    %(prog)s --info archive_dir/data.ta.0            # 查看加密提示信息。
+
+    从标准输出查看或解压内容时，需要用户判断是否需要添加-e参数。
 
 '''
 
@@ -138,14 +142,14 @@ def parse_args() -> tuple[Argument, Namespace]:
     parse.add_argument("-C", type=target_exists, default=".", help="解压输出目录(default: .)")
 
     # 从标准输入读取 或者输出到标准输出
-    parse.add_argument("-O", action="store_true", default=False, help="解压文件时输出到 标准输出。创建文件时从 标准输入 读取。")
+    # parse.add_argument("-O", action="store_true", default=False, help="解压文件时输出到 标准输出。创建文件时从 标准输入 读取。")
 
     group1 = parse.add_mutually_exclusive_group()
     group1.add_argument("-c", action="store_true", help="创建tar文件")
     group1.add_argument("-x", action="store_true", help="解压tar文件")
     group1.add_argument("-t", "--list", action="store_true", help="输出tar文件内容")
 
-    parse.add_argument("--dereference", action="store_true", default=False, help="默认为：False，如果为 True，则会将目标文件的内容添加到归档中。在不支持符号链接的系统上参数将不起作用。")
+    parse.add_argument("--dereference", action="store_true", default=False, help="默认为：False，如果为True，则会将目标文件的内容添加到归档中。 在不支持符号链接的系统上参数将不起作用。")
     parse.add_argument("--safe-extract", dest="safe_extract", action="store_true", help="解压时处理tar里不安全的路径(default: true)")
     parse.add_argument("-v", "--verbose", action="count", default=0, help="输出详情")
     parse.add_argument("-d", "--debug", action="count", default=0, help="输出debug详情信息")
@@ -162,7 +166,7 @@ def parse_args() -> tuple[Argument, Namespace]:
     parse_compress = parse.add_argument_group("压缩选项", description="只使用zstd压缩方案, 但可以解压 *.tar.gz, *.tar.bz2, *.tar.xz。")
     parse_compress.add_argument("-z", action="store_true", help="使用zstd压缩(default: level=3)")
     parse_compress.add_argument("-l", dest="level", metavar="level", type=compress_level, default=3, help="指定压缩level: 1 ~ 22")
-    parse_compress.add_argument("-T", dest="threads", metavar="threads", type=int, default=util.cpu_physical(), help="默认使用CPU物理/2的核心数，最大8个线程。")
+    parse_compress.add_argument("-T", dest="threads", metavar="threads", type=int, default=util.cpu_physical(), help="默认使用CPU物理/2的核心数，默认最大只使用8个线程。")
 
 
     parse_encrypt = parse.add_argument_group("加密", description="使用aes-256系列加密算法")
