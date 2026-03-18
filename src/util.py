@@ -365,7 +365,7 @@ def tar2pipe(paths: list[Path], pipe: ReadWrite, verbose: bool, dereference: boo
     logger.debug(f"打包完成: {paths}")
     pipe.close()
 
-
+"""
 # 提取到路径下# py 3.14 之前的，
 def pipe2tar(pipe: ReadWrite, path: Path, verbose=False):
     tar: tarfile.TarFile
@@ -382,9 +382,7 @@ def pipe2tarlist(pipe: ReadWrite, verbose=False):
     tar: tarfile.TarFile
     with tarfile.open(mode="r|*", fileobj=pipe) as tar:
         tar.list(verbose)
-
-# py3.14 新的方式可以简化代码。
-
+"""
 
 
 #################

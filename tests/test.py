@@ -9,12 +9,17 @@ import subprocess
 import tempfile
 import shutil
 import os
+import sys
 from pathlib import Path
 
-from src import version
+# 将项目根目录添加到导入路径
+project_root = Path(__file__).parent.parent / "src"
+sys.path.insert(0, str(project_root))
+
+import version
 
 
-TAR_SCRIPT = os.path.abspath(os.path.join(os.path.dirname(__file__), "tar.py"))
+TAR_SCRIPT = project_root / "tar.py"
 
 
 class MainTestCase(unittest.TestCase):
@@ -34,11 +39,14 @@ class TarPyFunctionalTest(unittest.TestCase):
         self.tmpdir = tempfile.mkdtemp()
         self.srcdir = Path(self.tmpdir) / "src"
         self.srcdir.mkdir()
+
+
         # 创建测试文件
         (self.srcdir / "file1.txt").write_text("hello world\n")
         (self.srcdir / "file2.txt").write_text("tar.py test\n")
         (self.srcdir / "subdir").mkdir()
         (self.srcdir / "subdir" / "file3.txt").write_text("subdir file\n")
+
         self.archive = Path(self.tmpdir) / "test.tar"
         self.archive_zst = Path(self.tmpdir) / "test.tar.zst"
         self.archive_enc = Path(self.tmpdir) / "test.ta"
@@ -48,7 +56,7 @@ class TarPyFunctionalTest(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def run_tar(self, args, input=None, env=None):
-        cmd = ["python3", TAR_SCRIPT] + args
+        cmd = ["python", TAR_SCRIPT] + args
         result = subprocess.run(
             cmd,
             input=input,
