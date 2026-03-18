@@ -85,6 +85,11 @@ def target_exists(filename):
     else:
         raise argparse.ArgumentTypeError(f"{p} 不存在")
 
+def check_path(path):
+    if path == "-" or path is None:
+        return None
+    else:
+        return Path(path)
 
 Description='''\
 POXIS tar 工具 + zstd + AES加密 + sha计算 + split大文件分割
@@ -129,11 +134,11 @@ def parse_args() -> tuple[Argument, Namespace]:
     # 位置参数
     parse.add_argument('target', nargs='*', type=target_exists, help='文件s | 目录s')
 
-    parse.add_argument("-f", type=Path, help="archive 文件, 没有这参数时，默认使用标准输入输出。")
+    parse.add_argument("-f", type=check_path, help="archive 文件, 没有这参数时 或者 参数为:-, 默认使用标准输入输出。")
     parse.add_argument("-C", type=target_exists, default=".", help="解压输出目录(default: .)")
 
     # 从标准输入读取 或者输出到标准输出
-    parse.add_argument("-O", action="store_true", default=False, help="解压文件时输出 标准输出。创建文件时从 标准输入 读取。")
+    parse.add_argument("-O", action="store_true", default=False, help="解压文件时输出到 标准输出。创建文件时从 标准输入 读取。")
 
     group1 = parse.add_mutually_exclusive_group()
     group1.add_argument("-c", action="store_true", help="创建tar文件")
@@ -189,7 +194,7 @@ def parse_args() -> tuple[Argument, Namespace]:
     parse_split.add_argument("--split-prefix", default="data", help="指定切割文件的前缀名(default: data)")
     parse_split.add_argument("--split-suffix", default="tar", help="自动生成，不需要指定。切割文件的后缀，几种: *.tar|*.t, *.tz, *.ta, *.tza")
     # parse_split.add_argument("--suffix-number", default="00", help="指定切割文件后缀(default: 00 开始)" )
-    parse_split.add_argument("--split-sha", action="store_true", help="计算切割文件的sha值(通过前面的sha系列指定算法)。(default: sha256)")
+    parse_split.add_argument("--split-sha", action="store_true", help="计算忆切割文件的sha值(通过前面的sha系列指定算法)。(default: sha256)")
 
 
     parse.add_argument("--parse", action="store_true", help=argparse.SUPPRESS)

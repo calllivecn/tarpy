@@ -160,7 +160,7 @@ split_merge(){
 	$CMD -ezx -k "123ji" --split "$dir_test/split" "$dir_in" -C "$dir_out" && echo "测试 解压 *.tar.zst.aes + split 成功" || echo "测试 解压 *.tar.zst.aes + split 失败"
 	
 	echo "测试--split-sha:"
-	$CMD --split-sha --split-prefix data.tza --split "$dir_test/split" && echo "测试 从 split 目录中计算 sha 成功" || echo "测试 从 split 目录中计算 sha 失败"
+	$CMD --split-sha --split "$dir_test/split" && echo "测试 从 split 目录中计算 sha 成功" || echo "测试 从 split 目录中计算 sha 失败"
 	
 	clear_files
 }
