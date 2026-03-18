@@ -187,6 +187,7 @@ def open_stream(path: Path|str, mode: Literal["r", "w"]):
         finally:
             f.close()
 
+
 ##################
 # compress 相关处理函数
 ##################
@@ -333,6 +334,8 @@ class TarpyFilter:
             tarfile.data_filter(member, path)
         except Exception as e:
             logger.error(f"{member}: 报错跳过处理", exc_info=e)
+        
+        return member
 
 
 def extract(readable: ReadWrite, path: Path, verbose=False):
@@ -365,13 +368,21 @@ def tarlist(readable: Path | ReadWrite, verbose=False):
         raise ValueError("参数错误")
 
 
-def filter(tarinfo: tarfile.TarInfo, verbose=False, fs=[]):
-    for fm in fs:
-        if fnmatchcase(tarinfo.name, fm):
-            return None
-    else:
-        if verbose:
+class AddFilter:
+
+    def __init__(self, verbose, excludes: list = []):
+        self.verbose = verbose
+        self.excludes = excludes
+
+    def __call__(self, tarinfo: tarfile.TarInfo):
+
+        if self.verbose:
             logger_print.info(f"{tarinfo.name}")
+
+        for fm in self.excludes:
+            if fnmatchcase(tarinfo.name, fm):
+                return None
+            
         return tarinfo
 
 
@@ -382,10 +393,11 @@ def tar2pipe(paths: list[Path], pipe: ReadWrite, verbose, excludes: list = []):
     只使用 给出路径最右侧做为要打包的内容
     例："../../dir1/dir2" --> 只会打包 dir2 目录|文件
     """
+    add_filter = AddFilter(verbose, excludes)
     tar: tarfile.TarFile
     with tarfile.open(mode="w|", fileobj=pipe) as tar:
         for path in paths:
-            tar.add(path, filter=filter)
+            tar.add(path, filter=add_filter)
     logger.debug(f"打包完成: {paths}")
     pipe.close()
 
@@ -568,7 +580,7 @@ def split_prefix(args) -> str:
 
 def merge_prefix(args) -> Path:
     """
-    合并的时候自动检测 e
+    合并的时候自动检测是否是加密的
     """
 
     for split_suffix in (".tar", ".tz" ".ta", ".tza"):

@@ -11,14 +11,51 @@ import logging
 import getpass
 import tarfile
 # import traceback
+from pathlib import Path
 
 import util
 from libargparse import parse_args
 from logs import logger, logger_print
 
 
-NEWTARS = (".tar.aes", ".tar.zst.aes", ".ta", ".tza")
-TARFILE = (".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tbz", ".tar.xz", ".txz", ".tar.zst", ".tz")
+newtars1 = (".ta", ".tza")
+newtars2 = (".tar.aes",)
+newtars3 = (".tar.zst.aes",)
+NEWTARS = newtars1 + newtars2 + newtars3
+
+tars1 = (".tar", ".tgz", ".tbz2", ".tbz", ".txz", ".tz")
+tars2 = (".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst")
+TARFILE = tars1 + tars2
+
+
+def check_suffix_newtar(f: Path) -> bool:
+    """
+    从指定层级的后缀判断，是否要解密。
+    """
+
+    if f.suffixes[-1].lower() in newtars1:
+        return True
+    
+    
+    if "".join(f.suffixes[-2:]).lower() in newtars2:
+        return True
+    
+
+    if "".join(f.suffixes[-3:]).lower() in newtars3:
+        return True
+
+    return False
+
+
+def check_suffix_tar(f: Path) -> bool:
+
+    if f.suffixes[-1].lower() in tars1:
+        return True
+    
+    if "".join(f.suffixes[-2:]).lower() in tars2:
+        return True
+
+    return False
 
 
 def create(args, shafuncs):
@@ -65,27 +102,23 @@ def create(args, shafuncs):
 
 def extract_not_split(args):
 
-    suffixs = args.f.suffixes
-    suffix = "".join(suffixs).lower()
+    with util.open_stream(args.f, "r") as p:
 
-    with util.open_stream(args.f, "r") as f:
-        # 解压*.tar.gz *.tar.xz *.tar.bz2 *.tar.zst
-        if suffix in TARFILE:
+        if check_suffix_tar(args.f):
             try:
-                util.extract(f, args.C, args.verbose)
+                util.extract(p, args.C, args.verbose)
             except tarfile.ReadError:
                 logger.warning(f"{args.f}: 不是一个tar文件")
                 sys.exit(0)
     
-        # 解压后缀：NEWTARS
-        elif suffix in NEWTARS:
+        elif check_suffix_newtar(args.f):
             manager = util.ThreadManager()
 
-            p = manager.add_task(util.to_pipe, f, None, name="to pipe")
+            # p = manager.add_task(util.to_pipe, f, None, name="to pipe")
 
             # if args.e:
             # 自动检测是否解密
-            if suffix in (".tar.zst.aes", ".tz", ".tza"):
+            if check_suffix_newtar(args.f):
                 input_key(args)
                 p = manager.add_task(util.decrypt, p, None, args.k, name="decrypt")
     
@@ -106,7 +139,6 @@ def extract_not_split(args):
             raise tarfile.ReadError(f"未知格式文件: {args.f}")
 
 
-
 def extract4split(args):
     """
     解压分割文件
@@ -123,10 +155,9 @@ def extract4split(args):
         p = manager.add_pipe()
 
     # 自动检测是否解密
-    if file.suffix in (".tz", ".tza"):
+    if check_suffix_newtar(args):
         input_key(args)
         p = manager.add_task(util.decrypt, p, None, args.k, name="decrypt")
-    
 
     # if args.z:
     #     p = manager.add_task(util.decompress, p, None, name="decompress")
@@ -155,20 +186,14 @@ def extract(args):
         extract_not_split(args)
 
 
-def tarlist_not_split(args, suffix: str):
-    """
-    处理 NESTARS 文件
-    """
+def tarlist_not_split(args):
 
     manager = util.ThreadManager()
     with util.open_stream(args.f, "r") as f:
 
         p = manager.add_task(util.to_pipe, f, None, name="tarlist4file")
 
-        if suffix not in NEWTARS:
-            raise tarfile.ReadError("未知格式文件")
-    
-        if suffix in (".tar.zst.aes", ".tza", ".ta"):
+        if check_suffix_newtar(args.f):
             input_key(args)
             p = manager.add_task(util.decrypt, p, None, args.k, name="decrypt")
 
@@ -186,13 +211,11 @@ def tarlist4split(args):
     splitter = util.FileSplitterMerger()
     p = manager.add_pipe()
 
-    # filename = util.split_prefix(args)
-    # manager.task(splitter.merge, filename, args.split, p, name="merge file to pipe")
     file = util.merge_prefix(args)
     manager.task(splitter.merge, file.name, args.split, p, name="merge file to pipe")
 
     # 自动检测是否解密
-    if file.suffix in (".tz", ".tza"):
+    if check_suffix_newtar(file):
         input_key(args)
         p = manager.add_task(util.decrypt, p, None, args.k)
     
@@ -202,7 +225,7 @@ def tarlist4split(args):
     try:
         util.tarlist(p, args.verbose)
     except tarfile.ReadError:
-        logger_print.info(f"从标准输入解压: {NEWTARS} 需要指定，-z|-e 参数。")
+        logger_print.info(f"从标准输入解压: {NEWTARS} 需要指定 -e 参数。")
         logger_print.info("可能原因：\n1. 密码错误。\n2. 可以解压格式不对。")
         sys.exit(1)
 
@@ -215,13 +238,11 @@ def tarlist(args):
         tarlist4split(args)
 
     else:
-        suffixs = args.f.suffixes
-        suffix = "".join(suffixs).lower()
 
-        if suffix in NEWTARS:
-            tarlist_not_split(args, suffix)
+        if check_suffix_newtar(args.f):
+            tarlist_not_split(args)
 
-        elif suffix in TARFILE:
+        elif check_suffix_tar(args.f):
             try:
                 util.tarlist(args.f, args.verbose)
             except tarfile.ReadError:

@@ -80,7 +80,7 @@ tarpy(){
 	test_tar=$(mktemp -u -p "$dir_test" --suffix .tar.zst.aes)
 	echo "创建: $test_tar"
 	$CMD -k "123456" -ezcf "$test_tar" "$dir_in" && echo "测试创建*.tar.zst.aes 成功" || echo "测试创建*.tar.zst.aes 失败"
-	$CMD -k "123456" -ezxf "$test_tar" -C "$dir_out" && echo "测试解压*.tar.zst.aes 成功" || echo "测试解压*.tar.zst.aes 失败" 
+	$CMD -k "123456" -ezxf "$test_tar" -C "$dir_out" && echo "测试解压*.tar.zst.aes 成功" || echo "测试解压*.tar.zst.aes 失败"
 	clear_files
 
 	# 测试从标准输入和标准输出
