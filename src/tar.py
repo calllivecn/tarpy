@@ -125,6 +125,7 @@ def extract_not_split(args):
         elif check_suffix_newtar(args.f):
             # 自动检测是否解密
             input_key(args)
+            print(f"{args.k=}")
             p = manager.add_task(util.decrypt, p, None, args.k, name="decrypt")
 
         else:
@@ -133,7 +134,7 @@ def extract_not_split(args):
         try:
             util.extract(p, args.C, args.verbose)
         except tarfile.ReadError:
-            logger_print.info(f"解压: {NEWTARS} 需要指定，-e 参数。\n可能原因：\n1. 密码错误。\n2. 可以解压格式不对。")
+            logger_print.info("如果从标准输入解压,需要指定 -e 参数。\n可能原因：\n1. 密码错误。\n2. 可以解压格式不对。")
             sys.exit(1)
         
         manager.join_threads()

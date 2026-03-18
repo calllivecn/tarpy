@@ -142,7 +142,7 @@ def parse_args() -> tuple[Argument, Namespace]:
     parse.add_argument("-C", type=target_exists, default=".", help="解压输出目录(default: .)")
 
     # 从标准输入读取 或者输出到标准输出
-    # parse.add_argument("-O", action="store_true", default=False, help="解压文件时输出到 标准输出。创建文件时从 标准输入 读取。")
+    parse.add_argument("-O", action="store_true", default=False, help="解压文件时输出到 标准输出。创建文件时从 标准输入 读取。")
 
     group1 = parse.add_mutually_exclusive_group()
     group1.add_argument("-c", action="store_true", help="创建tar文件")
@@ -188,7 +188,7 @@ def parse_args() -> tuple[Argument, Namespace]:
     parse_hash.add_argument("--sha-all", action="store_true", help="同时计算以上所有哈希值")
 
     split_description = """
-    在创建时分割会创建这里提供的目录。把文件名从-z -e这里生成。
+    在创建时分割会创建这里提供的目录。文件名从-z -e这里生成。
     会根据 -z 和 -e 选项来生成对应后缀*.tar|*.t, *.tz, *.ta, *.tza
     当没有指定--sha-file时，会输出到--split 目录下名为: sha.txt
     """

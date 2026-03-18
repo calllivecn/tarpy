@@ -1,12 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import sys
+
+hi = ["cryptography"]
 
 a = Analysis(
     ['src/tar.py'],
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=["pyzstd", "cryptography"],
+    hiddenimports=hi,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

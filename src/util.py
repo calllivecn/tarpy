@@ -23,12 +23,6 @@ from contextlib import contextmanager
 import traceback
 from compression import zstd
 
-from pyzstd import (
-    CParameter,
-    # DParameter,
-    ZstdCompressor,
-    ZstdDecompressor,
-)
 
 import libcrypto
 from protocols import (
@@ -192,37 +186,6 @@ def open_stream(path: Path, mode: Literal["r", "w"]):
 # compress 相关处理函数
 ##################
 
-def compress(rpipe: ReadWrite, wpipe: ReadWrite, level: int, threads: int):
-
-    op = {
-        CParameter.compressionLevel: level,
-        CParameter.nbWorkers: threads,
-    }
-
-    Zst = ZstdCompressor(level_or_option=op)
-    logger.debug(f"压缩等级: {level}, 线程数: {threads}")
-
-    while (tar_data := rpipe.read(BLOCKSIZE)) != b"":
-        # 有时候写入的数据少(或者压缩的好)，会返回空
-        zdata = Zst.compress(tar_data)
-        if zdata:
-            wpipe.write(zdata)
-
-    wpipe.write(Zst.flush())
-
-    logger.debug("压缩完成")
-    wpipe.close()
-
-
-def decompress(rpipe: ReadWrite, wpipe: ReadWrite):
-    # 解压没有 nbWorkers 参数
-    zst = ZstdDecompressor()
-    while (zst_data := rpipe.read(BLOCKSIZE)) != b"":
-        tar_data = zst.decompress(zst_data)
-        if tar_data:
-            wpipe.write(tar_data)
-    wpipe.close()
-
 def compress_py314(rpipe: ReadWrite, wpipe: ReadWrite, level: int, threads: int):
     op = {
         zstd.CompressionParameter.compression_level: level,
@@ -243,6 +206,7 @@ def compress_py314(rpipe: ReadWrite, wpipe: ReadWrite, level: int, threads: int)
     logger.debug("压缩完成")
     wpipe.close()
 
+"""
 def decompress_py314(rpipe: ReadWrite, wpipe: ReadWrite):
     # 解压没有 nbWorkers 参数
     zst = zstd.ZstdDecompressor()
@@ -251,7 +215,7 @@ def decompress_py314(rpipe: ReadWrite, wpipe: ReadWrite):
         if tar_data:
             wpipe.write(tar_data)
     wpipe.close()
-
+"""
 
 ##################
 # crypto 相关处理函数
