@@ -13,7 +13,7 @@ on:
         required: true
         type: number
 
-  # 方案 2: 自动触发（当 build 工作流完成后）
+  # 方案 2: 自动触发（当 build 工作流完成后）git log --oneline -5 -- .github/workflows/release.yml
   # workflow_run:
   #   workflows: ['Build']  # 替换为实际的构建工作流名称
   #   types:

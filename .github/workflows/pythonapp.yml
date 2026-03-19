@@ -40,7 +40,7 @@ jobs:
       env:
         PYTHONUTF8: 1
         CMD_TYPE: --dist
-        CWD_DIR_IN: .
+        CWD_DIR_IN: build/
       run: python tests/test.py -v > tests/test-result.txt 2>&1
       continue-on-error: true
 
@@ -80,7 +80,7 @@ jobs:
       env:
         PYTHONUTF8: 1
         CMD_TYPE: --dist
-        CWD_DIR_IN: .
+        CWD_DIR_IN: build/
       run: python tests/test.py -v > tests/test-result.txt 2>&1
       continue-on-error: true
 
