@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  # 方案 1: 手动触发（推荐用于正式发布）
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release 标签名 (例如 v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      build_run_id:
+        description: '构建工作流的 Run ID (数字，可在构建页面 URL 中找到)'
+        required: true
+        type: number
+
+  # 方案 2: 自动触发（当 build 工作流完成后）
+  # workflow_run:
+  #   workflows: ['Build']  # 替换为实际的构建工作流名称
+  #   types:
+  #     - completed
+  #   branches:
+  #     - ci
+  #     - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # 如果是 workflow_run 触发，只在构建成功时运行
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+    - name: 设置 Run ID
+      id: set_run_id
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          echo "run_id=${{ inputs.build_run_id }}" >> $GITHUB_OUTPUT
+        else
+          echo "run_id=${{ github.event.workflow_run.id }}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: 下载 Linux 构建产物
+      uses: actions/download-artifact@v5
+      with:
+        name: tarpy-Linux
+        path: ./dist/linux
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        run-id: ${{ steps.set_run_id.outputs.run_id }}
+
+    - name: 下载 Windows 构建产物
+      uses: actions/download-artifact@v5
+      with:
+        name: tarpy-Windows
+        path: ./dist/windows
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        run-id: ${{ steps.set_run_id.outputs.run_id }}
+
+    - name: 查看下载的产物
+      run: |
+        echo "=== Linux 产物 ==="
+        ls -lh ./dist/linux
+        echo "=== Windows 产物 ==="
+        ls -lh ./dist/windows
+
+    - name: 发布到 Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ inputs.tag_name || github.event.workflow_run.head_branch }}
+        files: |
+          ./dist/linux/*
+          ./dist/windows/*
+        generate_release_notes: true
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

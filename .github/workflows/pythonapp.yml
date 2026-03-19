@@ -81,7 +81,7 @@ jobs:
         PYTHONUTF8: 1
         CMD_TYPE: --dist
         CWD_DIR_IN: .
-      run: python tests/test.py -v
+      run: python tests/test.py -v > tests/test-result.txt 2>&1
       continue-on-error: true
 
     - name: 保存 ${{ env.APPNAME }}-${{ runner.os }}
