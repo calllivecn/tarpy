@@ -110,16 +110,18 @@ jobs:
         run: |
           echo "=== Linux 产物 ==="
           ls -lh ./dist/linux || echo "No linux files"
+          mv -v ./dist/linux/tarpy ./dist/linux/tarpy-linux
           echo "=== Windows 产物 ==="
           ls -lh ./dist/windows || echo "No windows files"
+          mv -v ./dist/windows/tarpy.exe ./dist/windows/tarpy-windows.exe
 
       - name: 发布到 Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.vars.outputs.tag_name }}
           files: |
-            ./dist/linux/*
-            ./dist/windows/*
+            ./dist/linux/tarpy-linux
+            ./dist/windows/tarpy-windows.exe
           generate_release_notes: true
           draft: false
           prerelease: false
