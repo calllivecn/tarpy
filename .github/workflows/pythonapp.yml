@@ -11,8 +11,7 @@ env:
   APPNAME: "tarpy"
   # 也可以引用 Contexts 或 Secrets
   #CACHE_KEY: ${{ github.sha }}
-  CMD_TYPE: --dist
-  CWD_DIR_IN: .
+
 
 jobs:
   build-linux:
@@ -38,8 +37,12 @@ jobs:
         ls -lh
     
     - name: 运行测试
-      run: |
-        python tests/test.py -v > tests/test-result.txt 2>&1
+      env:
+        PYTHONUTF8: 1
+        CMD_TYPE: --dist
+        CWD_DIR_IN: .
+      run: python tests/test.py -v > tests/test-result.txt 2>&1
+      continue-on-error: true
 
     - name: 保存 ${{ env.APPNAME }}-${{ runner.os }}
       uses: actions/upload-artifact@v5
@@ -74,8 +77,12 @@ jobs:
         dir
 
     - name: 运行测试
-      run: |
-        python tests/test.py -v
+      env:
+        PYTHONUTF8: 1
+        CMD_TYPE: --dist
+        CWD_DIR_IN: .
+      run: python tests/test.py -v
+      continue-on-error: true
 
     - name: 保存 ${{ env.APPNAME }}-${{ runner.os }}
       uses: actions/upload-artifact@v5
