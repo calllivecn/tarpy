@@ -1,171 +1,186 @@
-#!/usr/bin/env python3
-# coding=utf-8
-# date 2024-01-30 03:47:12
-# author calllivecn <calllivecn@outlook.com>
-
-
 import unittest
 import subprocess
-import tempfile
-import shutil
 import os
+import shutil
+import tempfile
 import sys
+
 from pathlib import Path
 
-# 将项目根目录添加到导入路径
-project_root = Path(__file__).parent.parent / "src"
-sys.path.insert(0, str(project_root))
+# 配置测试目标
+# 可以通过环境变量修改，例如：CMD_TYPE=dist python3 test_tarpy.py
+CMD_TYPE = os.getenv("CMD_TYPE", "--tar.py") 
+CWD = Path(__file__).parent.parent
 
-import version
+CWD_DIR_IN = os.getenv("CWD_DIR_IN")
 
-
-TAR_SCRIPT = project_root / "tar.py"
-
-
-class MainTestCase(unittest.TestCase):
-    def test_version(self):
-        self.assertTrue(hasattr(version, "VERSION"), True)
-
-    def test_tar(self):
-        """test tar -vcf t.tar <dir>"""
-        pass
-
-    def test_pass(self):
-        pass
+CWD_OUT_NOT_CLEAR = os.getenv("CWD_OUT_NOT_CLEAR")
 
 
-class TarPyFunctionalTest(unittest.TestCase):
-    def setUp(self):
-        self.tmpdir = tempfile.mkdtemp()
-        self.srcdir = Path(self.tmpdir) / "src"
-        self.srcdir.mkdir()
+def get_command():
+    """根据参数获取要执行的命令"""
+    if CMD_TYPE == "--tarpy":
+        return ["tarpy"]
+    elif CMD_TYPE == "--dist":
+        return [CWD / "dist/tarpy"]
+    else:
+        return [sys.executable, CWD / "src/tar.py"]
 
 
-        # 创建测试文件
-        (self.srcdir / "file1.txt").write_text("hello world\n")
-        (self.srcdir / "file2.txt").write_text("tar.py test\n")
-        (self.srcdir / "subdir").mkdir()
-        (self.srcdir / "subdir" / "file3.txt").write_text("subdir file\n")
+class TestTarPy(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.cmd = get_command()
+        # 验证命令是否可用
+        try:
+            if CMD_TYPE == "--tarpy":
+                subprocess.run(["type", "tarpy"], check=True, capture_output=True, shell=True)
+        except subprocess.CalledProcessError:
+            raise unittest.SkipTest("tarpy 命令在系统中不可用")
 
-        self.archive = Path(self.tmpdir) / "test.tar"
-        self.archive_zst = Path(self.tmpdir) / "test.tar.zst"
-        self.archive_enc = Path(self.tmpdir) / "test.ta"
-        self.archive_zst_enc = Path(self.tmpdir) / "test.tza"
+        """每个测试用例开始前创建临时工作环境"""
+        cls.test_root = Path(tempfile.mkdtemp(suffix=".tar-test"))
+        print(f"使用的临时输出目录: {cls.test_root}")
 
-    def tearDown(self):
-        shutil.rmtree(self.tmpdir)
+        if CWD_DIR_IN and Path(CWD_DIR_IN).is_dir():
+            print(f"使用指定的输入目录测试： {CWD_DIR_IN}")
+            cls.dir_in = Path(CWD_DIR_IN)
+            
+        else:
+            cls.dir_in = cls.test_root / "dir_in"
+            cls.dir_in.mkdir()
+            # 创建一些随机测试文件
+            for i in range(3):
+                with open(cls.dir_in / f"file_{i}.txt", "w") as f:
+                    f.write(f"This is test file {i} content. " * 10000)
+        
+        
+        cls.dir_out = cls.test_root / "dir_out"
+        cls.dir_out.mkdir()
+        
 
-    def run_tar(self, args, input=None, env=None):
-        cmd = ["python", TAR_SCRIPT] + args
-        result = subprocess.run(
-            cmd,
-            input=input,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            cwd=self.tmpdir,
-            env=env,
-            text=True,
-        )
-        return result
+        # 记录生成的 tar 文件路径，方便清理（可选）
+        cls.current_tar = None
 
-    def test_create_and_extract_tar(self):
-        # 创建 tar 包
-        result = self.run_tar(["-cf", str(self.archive), str(self.srcdir)])
-        self.assertEqual(result.returncode, 0, msg=result.stderr)
-        self.assertTrue(self.archive.exists())
+    @classmethod
+    def tearDownClass(cls):
+        """每个测试用例结束后清理环境"""
+        if cls.test_root.exists() and not CWD_OUT_NOT_CLEAR:
+            shutil.rmtree(cls.test_root)
 
-        # 解包
-        extract_dir = Path(self.tmpdir) / "extract"
-        extract_dir.mkdir()
-        result = self.run_tar(["-xf", str(self.archive), "-C", str(extract_dir)])
-        self.assertEqual(result.returncode, 0, msg=result.stderr)
-        # 校验文件内容
-        self.assertTrue((extract_dir / "src" / "file1.txt").exists())
-        self.assertEqual(
-            (extract_dir / "src" / "file1.txt").read_text(), "hello world\n"
-        )
-
-    def test_create_and_extract_zst(self):
-        # 创建 zstd 压缩包
-        result = self.run_tar(["-zcf", str(self.archive_zst), str(self.srcdir)])
-        self.assertEqual(result.returncode, 0, msg=result.stderr)
-        self.assertTrue(self.archive_zst.exists())
-
-        # 解包
-        extract_dir = Path(self.tmpdir) / "extract_zst"
-        extract_dir.mkdir()
-        result = self.run_tar(["-zxf", str(self.archive_zst), "-C", str(extract_dir)])
-        self.assertEqual(result.returncode, 0, msg=result.stderr)
-        self.assertTrue((extract_dir / "src" / "file2.txt").exists())
-        self.assertEqual(
-            (extract_dir / "src" / "file2.txt").read_text(), "tar.py test\n"
+    def run_cmd(self, args, input_data=None, capture_output=True):
+        """运行命令的辅助函数"""
+        full_args = self.cmd + args
+        print(f"执行的命令：{full_args}")
+        return subprocess.run(
+            full_args,
+            input=input_data,
+            capture_output=capture_output,
+            text=False # 处理二进制流
         )
 
-    def test_create_and_extract_encrypted(self):
-        # 创建加密包
-        password = "123456"
-        env = os.environ.copy()
-        env["PYTHONIOENCODING"] = "utf-8"
-        # 交互式输入密码
-        result = self.run_tar(
-            ["-ecf", str(self.archive_enc), str(self.srcdir)],
-            input=f"{password}\n{password}\n",
-            env=env,
-        )
-        self.assertEqual(result.returncode, 0, msg=result.stderr)
-        self.assertTrue(self.archive_enc.exists())
+    def test_basic_formats(self):
+        """测试基础格式: .tar 和 .tar.zst"""
+        formats = [
+            (".tar", ["-vcf", "-vxf"]),
+            (".tar.zst", ["-zcf", "-zxf"])
+        ]
+        
+        for suffix, flags in formats:
+            tar_path = self.test_root / f"test{suffix}"
+            tar_out = self.dir_out / suffix
+            tar_out.mkdir()
+            # 压缩
+            res_c = self.run_cmd([flags[0], tar_path, self.dir_in])
+            self.assertEqual(res_c.returncode, 0, f"创建 {suffix} 失败")
+            
+            # 解压
+            res_x = self.run_cmd([flags[1], tar_path, "-C", tar_out])
+            self.assertEqual(res_x.returncode, 0, f"解压 {suffix} 失败")
 
-        # 解包
-        extract_dir = Path(self.tmpdir) / "extract_enc"
-        extract_dir.mkdir()
-        result = self.run_tar(
-            ["-exf", str(self.archive_enc), "-C", str(extract_dir)],
-            input=f"{password}\n",
-            env=env,
-        )
-        self.assertEqual(result.returncode, 0, msg=result.stderr)
-        self.assertTrue((extract_dir / "src" / "subdir" / "file3.txt").exists())
-        self.assertEqual(
-            (extract_dir / "src" / "subdir" / "file3.txt").read_text(), "subdir file\n"
-        )
 
-    def test_create_and_extract_zst_encrypted(self):
-        # 创建压缩加密包
-        password = "654321"
-        env = os.environ.copy()
-        env["PYTHONIOENCODING"] = "utf-8"
-        result = self.run_tar(
-            ["-ezcf", str(self.archive_zst_enc), str(self.srcdir)],
-            input=f"{password}\n{password}\n",
-            env=env,
-        )
-        self.assertEqual(result.returncode, 0, msg=result.stderr)
-        self.assertTrue(self.archive_zst_enc.exists())
+    def test_aes_encryption(self):
+        """测试 AES 加密格式 .tar.zst.aes"""
+        suffix = ".tar.zst.aes"
+        tar_path = self.test_root / f"test{suffix}"
+        key = "123456"
 
-        # 解包
-        extract_dir = Path(self.tmpdir) / "extract_zst_enc"
-        extract_dir.mkdir()
-        result = self.run_tar(
-            ["-ezxf", str(self.archive_zst_enc), "-C", str(extract_dir)],
-            input=f"{password}\n",
-            env=env,
-        )
-        self.assertEqual(result.returncode, 0, msg=result.stderr)
-        self.assertTrue((extract_dir / "src" / "file1.txt").exists())
-        self.assertEqual(
-            (extract_dir / "src" / "file1.txt").read_text(), "hello world\n"
-        )
+        # 压缩
+        res_c = self.run_cmd(["-k", key, "-ezcf", tar_path, self.dir_in])
+        self.assertEqual(res_c.returncode, 0)
 
-    def test_list_tar(self):
-        # 创建 tar 包
-        result = self.run_tar(["-cf", str(self.archive), str(self.srcdir)])
-        self.assertEqual(result.returncode, 0, msg=result.stderr)
-        # 列表
-        result = self.run_tar(["-tf", str(self.archive)])
-        self.assertEqual(result.returncode, 0, msg=result.stderr)
-        self.assertIn("file1.txt", result.stdout)
-        self.assertIn("file2.txt", result.stdout)
+        # 查看列表 (tvf)
+        res_t = self.run_cmd(["-k", key, "-eztvf", tar_path])
+        self.assertEqual(res_t.returncode, 0)
 
+        # 解压
+        res_x = self.run_cmd(["-k", key, "-ezxf", tar_path, "-C", self.dir_out])
+        self.assertEqual(res_x.returncode, 0)
+
+    def test_pipes_stdin_stdout(self):
+        """测试标准输入输出流"""
+        key = "123456"
+
+        out_path = self.test_root / "stdin2stdout"
+        out_path.mkdir()
+        
+        # 测试： 压缩到 stdout -> 获取 bytes -> 通过 stdin 解压
+        # 对应原脚本: $CMD -ezc $dir_in > $test_tar
+        res_c = self.run_cmd(["-k", key, "-ezcf", "-", self.dir_in])
+        self.assertEqual(res_c.returncode, 0)
+        tar_data = res_c.stdout
+        
+        # 对应原脚本: cat $test_tar | $CMD -ezx -C $dir_out
+        res_x = self.run_cmd(["-k", key, "-ezxf", "-", "-C", out_path], input_data=tar_data)
+        self.assertEqual(res_x.returncode, 0)
+
+    def test_system_tar(self):
+        """测试对系统 tar 创建的 gz/bz2/xz/zstd 文件的兼容性"""
+        for compress_flag, suffix in [("-z", ".tar.gz"), ("-j", ".tar.bz2"), ("-J", ".tar.xz"), ("--zstd", ".tar.zst")]:
+            tar_path =  self.test_root / f"GNU-tar{suffix}"
+            out_path = self.test_root / f"GNU-tar-out{suffix}"
+            out_path.mkdir()
+            stdout_path = self.test_root / f"GNU-tar-stdout{suffix}"
+            stdout_path.mkdir()
+            
+            # 使用系统 tar 创建
+            subprocess.run(["tar", compress_flag, "-cf", tar_path, self.dir_in], check=True)
+            
+            # 使用 tarpy 解压文件
+            res_x = self.run_cmd(["-xf", tar_path, "-C", out_path])
+            self.assertEqual(res_x.returncode, 0, f"解压系统 {suffix} 失败")
+            
+            # 使用 tarpy 从 stdin 解压
+            with open(tar_path, "rb") as f:
+                res_stdin = self.run_cmd(["-xf", "-", "-C", stdout_path], input_data=f.read())
+            self.assertEqual(res_stdin.returncode, 0, f"从 stdin 解压系统 {suffix} 失败")
+
+
+    def test_split_merge(self):
+        """测试分卷压缩与合并"""
+        split_dir = self.test_root / "split_parts"
+        split_out = self.test_root / "split_out"
+        split_dir.mkdir()
+        split_out.mkdir()
+        key = "123ji"
+
+        # Split
+        res_s = self.run_cmd([
+            "-ezc", "--sha512", "--sha256", "-k", key, 
+            "--split-size", "1M", "--split", split_dir, self.dir_in
+        ])
+        self.assertEqual(res_s.returncode, 0)
+
+        # Merge / Extract
+        res_m = self.run_cmd([
+            "-ezx", "-k", key, "--split", split_dir, 
+            self.dir_in, "-C",  split_out
+        ])
+        self.assertEqual(res_m.returncode, 0)
+
+        # Check SHA
+        res_sha = self.run_cmd(["--split-sha", "--split", split_dir])
+        self.assertEqual(res_sha.returncode, 0)
 
 if __name__ == "__main__":
     unittest.main()

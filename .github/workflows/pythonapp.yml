@@ -17,13 +17,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: 跑起来～
       run: |
         echo "安装uv"
         curl -LsSf https://astral.sh/uv/install.sh | sh
-        uv python install 3.12
+        uv python install 3.14
         uv venv build-uv-venv
         source build-uv-venv/bin/activate
         echo "安装uv+启用虚拟环境"
@@ -34,22 +34,28 @@ jobs:
         pyinstaller tar.spec
         echo "==================="
         ls -lh
+    
+    - name: 运行测试
+      run: |
+        CMD_TYPE=--dist CWD_DIR_IN=. python tests/test.py -v > tests/test-result.txt 2>&1
 
     - name: 保存 ${{ env.APPNAME }}-${{ runner.os }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: ${{ env.APPNAME }}-${{ runner.os }}
-        path: dist/${{ env.APPNAME}}
+        path: |
+          dist/${{ env.APPNAME}}
+          tests/test-result.txt
 
   build-windows:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
-    - name: Set up Python 3.12
+    - name: Set up Python 3.14
       uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        python-version: '3.14'
 
     - name: 跑起来～
       run: |
@@ -61,8 +67,14 @@ jobs:
         echo "==================="
         dir
 
+    - name: 运行测试
+      run: |
+        CMD_TYPE=--dist CWD_DIR_IN=. python tests/test.py -v > tests/test-result.txt 2>&1
+
     - name: 保存 ${{ env.APPNAME }}-${{ runner.os }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: ${{ env.APPNAME }}-${{ runner.os }}
-        path: dist\\${{ env.APPNAME }}.exe
+        path: |
+          dist\\${{ env.APPNAME }}.exe
+          tests\\test-result.txt
