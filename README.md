@@ -96,5 +96,5 @@ POXIS tar 工具 + zstd + AES加密 + sha计算 + split大文件分割
                         自动生成，不需要指定。切割文件的后缀，几种: *.tar|*.t, *.tz, *.ta, *.tza
   --split-sha           计算忆切割文件的sha值(通过前面的sha系列指定算法)。(default: sha256)
 
-Author: calllivecn <calllivecn@outlook.com>, Version: 1.0 Repositories: https://github.com/calllivecn/tar.py
+Author: calllivecn <calllivecn@outlook.com>, Version: 1.0 Repositories: https://github.com/calllivecn/tarpy
 ```

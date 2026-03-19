@@ -119,7 +119,7 @@ POXIS tar 工具 + zstd + AES加密 + sha计算 + split大文件分割
 
     %(prog)s --info archive_dir/data.ta.0            # 查看加密提示信息。
 
-    从标准输出查看或解压内容时，需要用户判断是否需要添加-e参数。
+    从标准输入查看或解压内容时，需要用户判断是否需要添加-e参数。
 
 '''
 
@@ -128,7 +128,7 @@ def parse_args() -> tuple[Argument, Namespace]:
     parse = Argument(
         usage="%(prog)s [option] [file ... or directory ...]",
         description=Description,
-        epilog=f"Author: calllivecn <calllivecn@outlook.com>, Version: {version.VERSION} Repositories: https://github.com/calllivecn/tar.py",
+        epilog=f"Author: calllivecn <calllivecn@outlook.com>, Version: {version.VERSION} Repositories: https://github.com/calllivecn/tarpy",
         add_help=False,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         )
@@ -138,8 +138,8 @@ def parse_args() -> tuple[Argument, Namespace]:
     # 位置参数
     parse.add_argument('target', nargs='*', type=target_exists, help='文件s | 目录s')
 
-    parse.add_argument("-f", type=check_path, help="archive 文件, 没有这参数时 或者 参数为:-, 默认使用标准输入输出。")
-    parse.add_argument("-C", type=target_exists, default=".", help="解压输出目录(default: .)")
+    parse.add_argument("-f", type=check_path, help="archive 文件, 没有时等价为:-, 默认使用标准输入输出。")
+    parse.add_argument("-C", type=target_exists, default=".", help="解压输出目录(默认: .)")
 
     # 从标准输入读取 或者输出到标准输出
     parse.add_argument("-O", action="store_true", default=False, help="解压文件时输出到 标准输出。创建文件时从 标准输入 读取。")
@@ -149,13 +149,13 @@ def parse_args() -> tuple[Argument, Namespace]:
     group1.add_argument("-x", action="store_true", help="解压tar文件")
     group1.add_argument("-t", "--list", action="store_true", help="输出tar文件内容")
 
-    parse.add_argument("--dereference", action="store_true", default=False, help="默认为：False，如果为True，则会将目标文件的内容添加到归档中。 在不支持符号链接的系统上参数将不起作用。")
-    parse.add_argument("--safe-extract", dest="safe_extract", action="store_true", help="解压时处理tar里不安全的路径(default: true)")
+    parse.add_argument("--dereference", action="store_true", default=False, help="默认为：False，为True则会将目标文件的内容添加到归档中。 在不支持符号链接的系统上参数将不起作用。")
+    parse.add_argument("--safe-extract", dest="safe_extract", action="store_true", help="解压时处理不安全的路径(默认: true)")
     parse.add_argument("-v", "--verbose", action="count", default=0, help="输出详情")
     parse.add_argument("-d", "--debug", action="count", default=0, help="输出debug详情信息")
 
-    parse.add_argument("--excludes", dest="excludes", metavar="PATTERN", nargs="+", default=[], help="排除这类文件,使用Unix shell: PATTERN")
-    # parse.add_argument("--excludes-regex", dest="excludes_regex", metavar="PATTERN", nargs="+", type=exclude_regex, help="排除这类文件, 使用正则 PATTERN")
+    parse.add_argument("--excludes", dest="excludes", metavar="PATTERN", nargs="+", default=[], help="排除文件,使用Unix shell: PATTERN")
+    # parse.add_argument("--excludes-regex", dest="excludes_regex", metavar="PATTERN", nargs="+", type=exclude_regex, help="排除文件, 使用正则 PATTERN")
 
     # 这个工具只支持解压这些，创建时只使用zstd
     # group2 = parse.add_mutually_exclusive_group()
@@ -163,42 +163,42 @@ def parse_args() -> tuple[Argument, Namespace]:
     # group2.add_argument('-j', '--bzip2', action='store_true', help='filter the archive through bzip2')
     # group2.add_argument('-J', '--xz', dest='xz', action='store_true', help='filter the archive through xz')
 
-    parse_compress = parse.add_argument_group("压缩选项", description="只使用zstd压缩方案, 但可以解压 *.tar.gz, *.tar.bz2, *.tar.xz。")
-    parse_compress.add_argument("-z", action="store_true", help="使用zstd压缩(default: level=3)")
+    parse_compress = parse.add_argument_group("压缩选项", description="只使用zstd压缩方案, 但可以解压 *.tar.gz, *.tar.bz2, *.tar.xz, *.tar.zst。")
+    parse_compress.add_argument("-z", action="store_true", help="使用zstd压缩(默认: level=3)")
     parse_compress.add_argument("-l", dest="level", metavar="level", type=compress_level, default=3, help="指定压缩level: 1 ~ 22")
     parse_compress.add_argument("-T", dest="threads", metavar="threads", type=int, default=util.cpu_physical(), help="默认使用CPU物理/2的核心数，默认最大只使用8个线程。")
 
 
     parse_encrypt = parse.add_argument_group("加密", description="使用aes-256系列加密算法")
     parse_encrypt.add_argument("-e", action="store_true", help="加密")
-    parse_encrypt.add_argument("-k", type=str, metavar="PASSWORD", action="store", help="指定密码 (default：启动后交互式输入)")
+    parse_encrypt.add_argument("-k", type=str, metavar="PASSWORD", action="store", help="指定密码 (默认：启动后交互式输入)")
     # parse_encrypt.add_argument("-d", action="store_true", help="解密")
     parse_encrypt.add_argument("--prompt", help="密码提示信息")
     parse_encrypt.add_argument("--info", type=target_exists, help="查看加密提示信息")
 
     parse_hash = parse.add_argument_group("计算输出文件的sha值")
-    parse_hash.add_argument("--sha-file", dest="sha_file", metavar="FILENAME", action="store", type=Path, help="哈希值输出到文件(default: stderr)")
+    parse_hash.add_argument("--sha-file", dest="sha_file", metavar="FILENAME", action="store", type=Path, help="哈希值输出到文件(默认: stderr)")
     parse_hash.add_argument("--md5", action="store_true", help="输出文件同时计算 md5")
     parse_hash.add_argument("--sha1", action="store_true", help="输出文件同时计算 sha1")
     parse_hash.add_argument("--sha224", action="store_true", help="输出文件同时计算 sha224")
-    parse_hash.add_argument("--sha256", action="store_true", help="输出文件同时计算 default: sha256")
+    parse_hash.add_argument("--sha256", action="store_true", help="输出文件同时计算 默认: sha256")
     parse_hash.add_argument("--sha384", action="store_true", help="输出文件同时计算 sha384")
     parse_hash.add_argument("--sha512", action="store_true", help="输出文件同时计算 sha512")
     parse_hash.add_argument("--blake2b", action="store_true", help="输出文件同时计算 blake2b")
     parse_hash.add_argument("--sha-all", action="store_true", help="同时计算以上所有哈希值")
 
     split_description = """
-    在创建时分割会创建这里提供的目录。文件名从-z -e这里生成。
+    在创建时切割, 会自动创建指定的目录。
     会根据 -z 和 -e 选项来生成对应后缀*.tar|*.t, *.tz, *.ta, *.tza
-    当没有指定--sha-file时，会输出到--split 目录下名为: sha.txt
+    当没有指定--sha-file时，默认会输出到--split 目录下名为: sha.txt
     """
     parse_split = parse.add_argument_group("切割输出文件", description=split_description)
-    parse_split.add_argument("--split", type=split_is_dir, help="切割时的输出目录 或者是 合并时的输入目录 (default: .)")
+    parse_split.add_argument("--split", type=split_is_dir, help="切割时的输出目录 或者是 合并时的输入目录 (默认: .)")
     parse_split.add_argument("--split-size", type=split_size, default="1G", help="单个文件最大大小(单位：B, K, M, G, T, P。 默认值：1G)")
-    parse_split.add_argument("--split-prefix", default="data", help="指定切割文件的前缀名(default: data)")
+    parse_split.add_argument("--split-prefix", default="data", help="指定切割文件的前缀名(默认: data)")
     parse_split.add_argument("--split-suffix", default="tar", help="自动生成，不需要指定。切割文件的后缀，几种: *.tar|*.t, *.tz, *.ta, *.tza")
-    # parse_split.add_argument("--suffix-number", default="00", help="指定切割文件后缀(default: 00 开始)" )
-    parse_split.add_argument("--split-sha", action="store_true", help="计算忆切割文件的sha值(通过前面的sha系列指定算法)。(default: sha256)")
+    # parse_split.add_argument("--suffix-number", default="00", help="指定切割文件后缀(默认: 00 开始)" )
+    parse_split.add_argument("--split-sha", action="store_true", help="计算切割文件的sha值(通过前面的sha系列指定算法)。(默认: sha256)")
 
 
     parse.add_argument("--parse", action="store_true", help=argparse.SUPPRESS)
