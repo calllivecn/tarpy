@@ -75,7 +75,7 @@ jobs:
 
     - name: 运行测试
       run: |
-        python tests/test.py -v > tests/test-result.txt 2>&1
+        python tests/test.py -v
 
     - name: 保存 ${{ env.APPNAME }}-${{ runner.os }}
       uses: actions/upload-artifact@v5
