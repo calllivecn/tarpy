@@ -64,8 +64,8 @@ jobs:
             const runs = await github.rest.actions.listWorkflowRuns({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: 'build.yml', // 替换为你构建工作流的文件名
-              branch: 'master',
+              workflow_id: 'pythonapp.yml', // 替换为你构建工作流的文件名
+              branch: 'ci',
               status: 'success',
               per_page: 1
             });
