@@ -11,6 +11,8 @@ env:
   APPNAME: "tarpy"
   # 也可以引用 Contexts 或 Secrets
   #CACHE_KEY: ${{ github.sha }}
+  CMD_TYPE: --dist
+  CWD_DIR_IN: .
 
 jobs:
   build-linux:
@@ -37,15 +39,19 @@ jobs:
     
     - name: 运行测试
       run: |
-        CMD_TYPE=--dist CWD_DIR_IN=. python tests/test.py -v > tests/test-result.txt 2>&1
+        python tests/test.py -v > tests/test-result.txt 2>&1
 
     - name: 保存 ${{ env.APPNAME }}-${{ runner.os }}
       uses: actions/upload-artifact@v5
       with:
         name: ${{ env.APPNAME }}-${{ runner.os }}
-        path: |
-          dist/${{ env.APPNAME}}
-          tests/test-result.txt
+        path: dist/${{ env.APPNAME}}
+
+    - name: 保存 ${{ env.APPNAME }}-${{ runner.os }}-result.txt
+      uses: actions/upload-artifact@v5
+      with:
+        name: ${{ env.APPNAME }}-${{ runner.os }}-result.txt
+        path: tests/test-result.txt
 
   build-windows:
     runs-on: windows-latest
@@ -69,12 +75,16 @@ jobs:
 
     - name: 运行测试
       run: |
-        CMD_TYPE=--dist CWD_DIR_IN=. python tests/test.py -v > tests/test-result.txt 2>&1
+        python tests/test.py -v > tests/test-result.txt 2>&1
 
     - name: 保存 ${{ env.APPNAME }}-${{ runner.os }}
       uses: actions/upload-artifact@v5
       with:
         name: ${{ env.APPNAME }}-${{ runner.os }}
-        path: |
-          dist\\${{ env.APPNAME }}.exe
-          tests\\test-result.txt
+        path: dist/${{ env.APPNAME }}.exe
+
+    - name: 保存 ${{ env.APPNAME }}-${{ runner.os }}-result.txt
+      uses: actions/upload-artifact@v5
+      with:
+        name: ${{ env.APPNAME }}-${{ runner.os }}-result.txt
+        path: tests/test-result.txt
