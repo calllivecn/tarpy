@@ -480,7 +480,11 @@ class AESGCM:
         memory_cost: KB 65536KB = 64 MB, 要使用的内存量，单位为千字节 (kib)。1 千字节 (KiB) 等于 1024 字节。这必须至少为 8 * lanes
         参考: https://cryptography.io/en/latest/hazmat/primitives/kdf/
         """
-        kdf = argon2.Argon2id(salt=salt, length=32, iterations=13, lanes=4, memory_cost=64 * 1024, ad=ad, secret=None)
+        if cpus := os.cpu_count():
+            lanes = cpus
+        else:
+            lanes = 1
+        kdf = argon2.Argon2id(salt=salt, length=32, iterations=13, lanes=lanes, memory_cost=64 * 1024, ad=ad, secret=None)
         return kdf.derive(self.key)
     
     def next_nonce(self, prefix8: bytes) -> bool:
