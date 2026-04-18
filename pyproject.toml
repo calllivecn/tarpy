@@ -1,0 +1,14 @@
+[project]
+name = "tarpy"
+version = "1.0"
+description = "POXIS tar 工具 + zstd + AES加密 + sha计算 + split大文件分割"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "cryptography>46.0,<47",
+]
+
+[dependency-groups]
+dev = [
+    "pyinstaller==6.19.0",
+]
