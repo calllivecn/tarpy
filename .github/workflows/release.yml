@@ -99,7 +99,7 @@ jobs:
           fi
 
       - name: 下载 Linux 构建产物
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: tarpy-Linux
           path: ./dist/linux
@@ -107,7 +107,7 @@ jobs:
           run-id: ${{ steps.final_run_id.outputs.id }}
 
       - name: 下载 Windows 构建产物
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: tarpy-Windows
           path: ./dist/windows
