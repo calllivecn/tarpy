@@ -1,2 +1,0 @@
-cryptography==50.0.0
-pyzstd==0.18.0;python_version <= "3.14"
