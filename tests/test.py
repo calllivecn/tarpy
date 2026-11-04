@@ -12,7 +12,7 @@ from unittest.mock import patch
 # 配置测试目标
 # 可以通过环境变量修改，例如：CMD_TYPE=dist python3 test_tarpy.py
 CMD_TYPE = os.getenv("CMD_TYPE", "--tar.py") 
-CWD = Path(__file__).parent.parent
+CWD = Path(__file__).resolve().parent.parent
 
 CWD_DIR_IN = os.getenv("CWD_DIR_IN")
 
@@ -70,7 +70,7 @@ class TestTarPy(unittest.TestCase):
         if cls.test_root.exists() and not CWD_OUT_NOT_CLEAR:
             shutil.rmtree(cls.test_root)
 
-    def run_cmd(self, args, input_data=None, capture_output=True):
+    def run_cmd(self, args, input_data=None, capture_output=True, cwd=None):
         """运行命令的辅助函数"""
         full_args = self.cmd + args
         print(f"执行的命令：{full_args}")
@@ -78,6 +78,7 @@ class TestTarPy(unittest.TestCase):
             full_args,
             input=input_data,
             capture_output=capture_output,
+            cwd=cwd,
             text=False # 处理二进制流
         )
 
@@ -99,13 +100,15 @@ class TestTarPy(unittest.TestCase):
         output = self.test_root / "nested_output"
         output.mkdir()
 
-        self.assert_success(self.run_cmd(["-ecf", archive, "-k", "password", source]))
+        self.assert_success(self.run_cmd(
+            ["-ecf", archive, "-k", "password", source.name], cwd=self.test_root
+        ))
         listing = self.run_cmd(["-tf", archive, "-k", "password"])
         self.assert_success(listing)
         for name in files:
             self.assertIn(name.encode(), listing.stdout)
         self.assert_success(self.run_cmd(["-xf", archive, "-k", "password", "-C", output]))
-        extracted = output / str(source).lstrip(os.sep)
+        extracted = output / source.name
         for name, content in files.items():
             with self.subTest(name=name):
                 self.assertEqual((extracted / name).read_bytes(), content)
