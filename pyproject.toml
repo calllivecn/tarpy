@@ -1,11 +1,10 @@
-# pyproject.toml
 [build-system]
-requires = ["setuptools>=84.1.0"]  # 仅需 setuptools 本身
-build-backend = "setuptools.build_meta"
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
 
 [project]
 name = "tarpy"
-dynamic = ["version"]  # 声明版本是动态的
+version = "1.1.0"
 description = "POXIS tar 工具 + zstd + AES加密 + sha计算 + split大文件分割"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -18,10 +17,6 @@ dev = [
     "pyinstaller>=6.22,<6.23",
 ]
 
+[tool.uv]
+package = false
 
-[tool.setuptools.package-dir]
-"" = "src"
-
-[tool.setuptools.dynamic]
-#version = {file = "src/version.py"}  # 从 VERSION 文件读取，需要内容是：1.0.x这种
-version = {attr = "version.VERSION"}

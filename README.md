@@ -2,6 +2,10 @@
 
 - 需要py3.14
 
+# 警告警告！！！
+
+- 这是一次严重bug级的修复！v1.0.0版本，在进行密钥派生的时候Argon2id算法的lanes参数配置错误，和之前不一样，导致1.0压缩的算法，在其他版本中解压不出来的问题(创建和解压时，在不同CPU核心数的机器上也解压不了！！！)，所以以1.0.0 不建议再使用。
+
 ## 一般用法
 
 ```shell
@@ -96,5 +100,5 @@ POXIS tar 工具 + zstd + AES加密 + sha计算 + split大文件分割
                         自动生成，不需要指定。切割文件的后缀，几种: *.tar|*.t, *.tz, *.ta, *.tza
   --split-sha           计算切割文件的sha值(通过前面的sha系列指定算法)。(默认: sha256)
 
-Author: calllivecn <calllivecn@outlook.com>, Version: 1.0.1 Repositories: https://github.com/calllivecn/tarpy
+Author: calllivecn <calllivecn@outlook.com>, Version: 1.1.0 Repositories: https://github.com/calllivecn/tarpy
 ```
