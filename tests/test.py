@@ -4,8 +4,10 @@ import os
 import shutil
 import tempfile
 import sys
+import io
 
 from pathlib import Path
+from unittest.mock import patch
 
 # 配置测试目标
 # 可以通过环境变量修改，例如：CMD_TYPE=dist python3 test_tarpy.py
@@ -78,6 +80,44 @@ class TestTarPy(unittest.TestCase):
             capture_output=capture_output,
             text=False # 处理二进制流
         )
+
+    def assert_success(self, result):
+        self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
+
+    def test_nested_encrypted_archive_roundtrip(self):
+        """加密包的列表和解压应保留嵌套目录、空文件及二进制内容。"""
+        source = self.test_root / "nested_source"
+        (source / "nested").mkdir(parents=True)
+        files = {
+            "nested/数据.bin": bytes(range(256)) * 100,
+            "nested/empty": b"",
+            "text.txt": "测试内容\n".encode(),
+        }
+        for name, content in files.items():
+            (source / name).write_bytes(content)
+        archive = self.test_root / "nested.tar.aes"
+        output = self.test_root / "nested_output"
+        output.mkdir()
+
+        self.assert_success(self.run_cmd(["-ecf", archive, "-k", "password", source]))
+        listing = self.run_cmd(["-tf", archive, "-k", "password"])
+        self.assert_success(listing)
+        for name in files:
+            self.assertIn(name.encode(), listing.stdout)
+        self.assert_success(self.run_cmd(["-xf", archive, "-k", "password", "-C", output]))
+        extracted = output / str(source).lstrip(os.sep)
+        for name, content in files.items():
+            with self.subTest(name=name):
+                self.assertEqual((extracted / name).read_bytes(), content)
+
+    def test_wrong_password_rejected(self):
+        """错误密码不能成功解压加密包。"""
+        archive = self.test_root / "wrong-password.tar.aes"
+        output = self.test_root / "wrong-password-output"
+        output.mkdir()
+        self.assert_success(self.run_cmd(["-ecf", archive, "-k", "correct", self.dir_in]))
+        result = self.run_cmd(["-xf", archive, "-k", "incorrect", "-C", output])
+        self.assertNotEqual(result.returncode, 0, "错误密码不应解密成功")
 
     def test_basic_formats(self):
         """测试基础格式: .tar 和 .tar.zst"""
@@ -181,6 +221,58 @@ class TestTarPy(unittest.TestCase):
         # Check SHA
         res_sha = self.run_cmd(["--split-sha", "--split", split_dir])
         self.assertEqual(res_sha.returncode, 0)
+
+
+class TestAESGCMCompatibility(unittest.TestCase):
+    """直接验证加密格式，避免只测试同一进程配置下的往返。"""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(CWD / "src"))
+        cls.addClassCleanup(sys.path.remove, str(CWD / "src"))
+        from libcrypto import AESGCM
+        cls.AESGCM = AESGCM
+
+    def encrypt_with_lanes(self, data, lanes):
+        output = io.BytesIO()
+        with patch("os.cpu_count", return_value=lanes):
+            self.AESGCM(b"password", 64).encrypt(io.BytesIO(data), output)
+        return output.getvalue()
+
+    def decrypt_with_lanes(self, data, lanes, password=b"password"):
+        stream = io.BytesIO(data)
+        version = int.from_bytes(stream.read(2), "big")
+        output = io.BytesIO()
+        with patch("os.cpu_count", return_value=lanes):
+            self.AESGCM(password, 64).decrypt(stream, output, version)
+        return output.getvalue()
+
+    def test_multichunk_roundtrip(self):
+        data = bytes(range(256)) + b"last chunk"
+        encrypted = self.encrypt_with_lanes(data, 4)
+        self.assertEqual(self.decrypt_with_lanes(encrypted, 4), data)
+
+    def test_authentication_rejects_wrong_password_and_tampering(self):
+        from cryptography.exceptions import InvalidTag
+        encrypted = self.encrypt_with_lanes(b"authenticated data", 4)
+        with self.assertRaises(InvalidTag):
+            self.decrypt_with_lanes(encrypted, 4, b"wrong")
+        damaged = encrypted[:-1] + bytes([encrypted[-1] ^ 1])
+        with self.assertRaises(InvalidTag):
+            self.decrypt_with_lanes(damaged, 4)
+
+    def test_v100_archive_decrypts_on_machine_with_different_cpu_count(self):
+        """v1.0.0 固定 lanes=4；旧格式不应依赖解密机器的 CPU 数量。"""
+        from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
+
+        def legacy_key(instance, salt, ad):
+            return Argon2id(salt=salt, length=32, iterations=13, lanes=4,
+                            memory_cost=64 * 1024, ad=ad, secret=None).derive(instance.key)
+
+        data = b"v1.0.0 compatible archive"
+        with patch.object(self.AESGCM, "key_Argon2id", legacy_key):
+            encrypted = self.encrypt_with_lanes(data, 4)
+        self.assertEqual(self.decrypt_with_lanes(encrypted, 8), data)
 
 if __name__ == "__main__":
     unittest.main()
