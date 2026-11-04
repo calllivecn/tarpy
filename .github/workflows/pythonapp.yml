@@ -36,6 +36,7 @@ jobs:
 
     - name: 安装uv+启用虚拟环境
       run: |
+        uv python install 3.14
         uv sync
         ls -lh
         echo "==================="
