@@ -106,7 +106,14 @@ class TestTarPy(unittest.TestCase):
         listing = self.run_cmd(["-tf", archive, "-k", "password"])
         self.assert_success(listing)
         for name in files:
-            self.assertIn(name.encode(), listing.stdout)
+            # tarfile.list 可转义非 ASCII 字符，Windows 也可能输出反斜杠。
+            variants = [name, name.replace("/", "\\")]
+            self.assertTrue(
+                any(encoded in listing.stdout for variant in variants for encoded in (
+                    variant.encode("utf-8"), variant.encode("ascii", "backslashreplace")
+                )),
+                f"列表中缺少 {name}: {listing.stdout!r}",
+            )
         self.assert_success(self.run_cmd(["-xf", archive, "-k", "password", "-C", output]))
         extracted = output / source.name
         for name, content in files.items():
